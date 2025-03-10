@@ -253,6 +253,4 @@ class TelaRelatorios(tk.Frame):
                escritor.writerows(dados)
            
            messagebox.showinfo("Sucesso", "Relatório exportado com sucesso!")
-           
-           
-           
+    

@@ -106,7 +106,7 @@ class MovementRepository:
                 ) AS qtd_atualizada
             FROM movimentacoes m
             JOIN produtos p ON m.produto_id = p.id
-            ORDER BY m.data_hora DESC;
+            ORDER BY m.data_hora ASC;
             """)
 
 
