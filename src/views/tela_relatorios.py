@@ -1,7 +1,12 @@
 import csv
+from sqlite3 import Cursor
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime, timedelta
+from database import conectar
+import openpyxl
+from openpyxl.styles import Font
+from tkinter import filedialog, messagebox
 
 class TelaRelatorios(tk.Frame):
     def __init__(self, master):
@@ -52,7 +57,7 @@ class TelaRelatorios(tk.Frame):
         
         # Botão para gerar relatório
         self.btn_gerar = tk.Button(filtros_frame, text="Gerar Relatório", command=self.gerar_relatorio,bg="#4a86e8", fg="white", width=15)
-        self.btn_exportar = tk.Button(filtros_frame, text="Exportar Relatório", command=self.exportar_para_csv, bg="#4a86e8", fg="white", width=15)
+        self.btn_exportar = tk.Button(filtros_frame, text="Exportar Relatório", command=self.exportar_para_excel, bg="#4a86e8", fg="white", width=15)
         
         
         self.btn_gerar.grid(row=3, column=0, sticky="e", pady=10)
@@ -106,32 +111,57 @@ class TelaRelatorios(tk.Frame):
     def relatorio_movimentacoes(self):
         # Criar treeview para movimento de estoque
         colunas = ("ID", "Data/Hora", "Produto", "Tipo", "Quantidade", "Usuário")
-        tabela = ttk.Treeview(self.relatorio_frame, columns=colunas, show="headings")
+        self.tabela = ttk.Treeview(self.relatorio_frame, columns=colunas, show="headings")
         
         # Definir cabeçalhos
         for col in colunas:
-            tabela.heading(col, text=col)
-            tabela.column(col, width=100, anchor="center")
+            self.tabela.heading(col, text=col)
+            self.tabela.column(col, width=100, anchor="center")
         
         # Ajustar larguras específicas
-        tabela.column("Data/Hora", width=150)
-        tabela.column("Produto", width=200)
+        self.tabela.column("Data/Hora", width=150)
+        self.tabela.column("Produto", width=200)
         
         # Scrollbar
-        scrollbar = ttk.Scrollbar(self.relatorio_frame, orient="vertical", command=tabela.yview)
-        tabela.configure(yscrollcommand=scrollbar.set)
+        scrollbar = ttk.Scrollbar(self.relatorio_frame, orient="vertical", command=self.tabela.yview)
+        self.tabela.configure(yscrollcommand=scrollbar.set)
         
         # Posicionar na tela
-        tabela.pack(side="left", fill="both", expand=True)
+        self.tabela.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # Adicionar dados de exemplo
-        for i in range(20):
-            data = datetime.now() - timedelta(hours=i*3)
-            tipo = "Entrada" if i % 2 == 0 else "Saída"
-            quantidade = i + 5
-            tabela.insert("", "end", values=(f"{i+1}", data.strftime("%d/%m/%Y %H:%M:%S"), 
-                                          f"Produto {i%5 + 1}", tipo, quantidade, "Administrador"))
+        try:
+            conexao = conectar()
+            cursor = conexao.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT 
+                    m.id, 
+                    m.data_hora, 
+                    p.nome AS produto, 
+                    m.tipo, 
+                    m.quantidade, 
+                    m.usuario 
+                FROM movimentacoes m
+                JOIN produtos p ON m.produto_id = p.id
+                ORDER BY m.data_hora DESC
+            """)
+
+            movimentacoes = cursor.fetchall()
+
+            for mov in movimentacoes:
+                data_formatada = mov['data_hora'].strftime("%d/%m/%Y %H:%M:%S")
+                self.tabela.insert(
+                    "", "end",
+                    values=(
+                    mov['id'], data_formatada, mov['produto'], mov['tipo'], mov['quantidade'], mov['usuario']
+                ))
+
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao buscar movimentações: {e}")
+    
+        finally:
+            cursor.close()
+            conexao.close()
 
     def relatorio_estoque_baixo(self):
         # Criar treeview para produtos com estoque baixo
@@ -233,8 +263,51 @@ class TelaRelatorios(tk.Frame):
             tabela.insert("", "end", values=(f"{i+1}", f"Produto {i+1}", quantidade, 
                                           f"R$ {valor_unitario:.2f}", f"R$ {valor_total:.2f}"))
             
-            
-    def exportar_para_csv(self):
+    def exportar_para_excel(self):
+        if not self.tabela.get_children():
+            messagebox.showwarning("Aviso", "Nenhum relatório foi gerado ainda!")
+            return
+
+        # Abrir a caixa de diálogo para salvar o arquivo
+        arquivo = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Arquivo Excel", "*.   xlsx")])
+
+        if not arquivo:
+            return
+
+        # Garantir que o nome do arquivo termina em .xlsx
+        if not arquivo.endswith(".xlsx"):
+            arquivo += ".xlsx"
+
+        colunas = [self.tabela.heading(col)["text"] for col in self.tabela["columns"]]
+        dados = [self.tabela.item(item, "values") for item in self.tabela.get_children()]
+
+        try:
+            # Criar um novo arquivo Excel
+            workbook = openpyxl.Workbook()
+            sheet = workbook.active
+            sheet.title = "Relatório"
+
+            # Adicionar cabeçalhos
+            for col_index, col_name in enumerate(colunas, start=1):
+                cell = sheet.cell(row=1, column=col_index, value=col_name)
+                cell.font = Font(bold=True)  # Negrito para os cabeçalhos
+
+            # Adicionar dados na planilha
+            for row_index, row_data in enumerate(dados, start=2):
+                for col_index, cell_value in enumerate(row_data, start=1):
+                    sheet.cell(row=row_index, column=col_index, value=cell_value)
+
+            # Salvar o arquivo Excel corretamente
+            workbook.save(arquivo)
+            workbook.close()  # 🔹 Fechar corretamente para evitar corrupção do arquivo
+
+            messagebox.showinfo("Sucesso", f"Relatório exportado com sucesso!\nSalvo em: {arquivo}")
+
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao exportar para Excel: {e}")
+
+
+    """   def exportar_para_csv(self):
            if not hasattr(self, "tabela"):
                messagebox.showwarning("Aviso", "Nenhum relatório foi gerado ainda!")
                return
@@ -252,5 +325,4 @@ class TelaRelatorios(tk.Frame):
                escritor.writerow(colunas)
                escritor.writerows(dados)
            
-           messagebox.showinfo("Sucesso", "Relatório exportado com sucesso!")
-    
+           messagebox.showinfo("Sucesso", "Relatório exportado com sucesso!")"""
