@@ -51,7 +51,7 @@ class ProductRepository:
         """Lista todos os produtos do banco de dados"""
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM produtos p LEFT JOIN categorias c ON p.categoria_id = c.id")
+        cursor.execute("SELECT * FROM produtos")
         produtos = []
         for row in cursor.fetchall():
            produtos.append({

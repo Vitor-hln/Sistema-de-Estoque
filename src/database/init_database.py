@@ -30,7 +30,7 @@ def init_database():
             descricao TEXT,
             valor DECIMAL(10,2) NOT NULL,
             quantidade INT NOT NULL,
-            lote VARCHAR(50) NOT NULL,
+            lote VARCHAR(50) NOT NULL
             );
         """)  # Fixed the syntax error (colon changed to semicolon) and added categoria_id column
         print("Tabela 'produtos' criada ou já existente")

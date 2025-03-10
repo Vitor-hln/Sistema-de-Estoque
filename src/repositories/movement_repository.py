@@ -24,7 +24,7 @@ class MovementRepository:
     def _init_db(self):
         # Cria a tabela de produtos se ela não existir
         query = '''
-        CREATE TABLE IF NOT EXISTS products (
+        CREATE TABLE IF NOT EXISTS produtos (
             id INT AUTO_INCREMENT PRIMARY KEY,
            data_hora DATETIME NOT NULL,
            produto_id INT NOT NULL,
@@ -84,31 +84,28 @@ class MovementRepository:
         cursor = conexao.cursor(dictionary=True)
         try:
             cursor.execute("""
-                SELECT 
-                m.tipo, 
-                m.quantidade, 
-                m.usuario, 
-                p.nome AS produto, 
-                m.data_hora,
-                GREATEST(
-                    0,  -- Se `qtd_atualizada` for menor que 0, exibe 0
-                    (
-                        SELECT COALESCE(SUM(
-                            CASE 
-                                WHEN m2.tipo = 'Entrada' THEN m2.quantidade 
-                                ELSE -m2.quantidade 
-                            END
-                        ), 0)
-                        FROM movimentacoes m2
-                        WHERE m2.produto_id = m.produto_id 
-                        AND m2.data_hora <= m.data_hora
-                    )
-                ) AS qtd_atualizada
-            FROM movimentacoes m
-            JOIN produtos p ON m.produto_id = p.id
-            ORDER BY m.data_hora ASC;
-            """)
-
+            SELECT 
+            m.tipo, 
+            m.quantidade, 
+            m.usuario, 
+            p.nome AS produto, 
+            m.data_hora,
+            (
+                SELECT COALESCE(SUM(
+                    CASE 
+                        WHEN m2.tipo = 'Entrada' THEN m2.quantidade  -- Somar nas Entradas
+                        WHEN m2.tipo = 'Saída' THEN -m2.quantidade   -- Subtrair nas Saídas
+                        ELSE 0 
+                    END
+                ), 0)
+                FROM movimentacoes m2
+                WHERE m2.produto_id = m.produto_id 
+                AND m2.data_hora <= m.data_hora
+            ) AS qtd_atualizada
+        FROM movimentacoes m
+        JOIN produtos p ON m.produto_id = p.id
+        ORDER BY m.data_hora ASC;
+        """)
 
             movimentacoes = cursor.fetchall()
 
