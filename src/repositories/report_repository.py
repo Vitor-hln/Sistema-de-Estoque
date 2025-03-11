@@ -58,3 +58,39 @@ class ReportRepository:
         finally:
             cursor.close()
             conexao.close()
+
+
+    def listar_produtos_estoque_baixo(self):
+        """Busca os produtos com estoque baixo"""
+        conexao = conectar()
+        cursor = conexao.cursor(dictionary=True)
+        
+        try:
+            cursor = conexao.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT 
+                    p.nome AS produto,
+                    p.quantidade AS estoque_atual,
+                    p.estoque_minimo,
+                    CASE 
+                        WHEN p.quantidade <= p.estoque_minimo * 0.5 THEN 'CRÍTICO'
+                        WHEN p.quantidade <= p.estoque_minimo THEN 'BAIXO'
+                        ELSE 'NORMAL'
+                    END AS status
+                FROM produtos p
+                WHERE p.quantidade <= p.estoque_minimo
+                ORDER BY 
+                    CASE 
+                        WHEN p.quantidade <= p.estoque_minimo * 0.5 THEN 1
+                        WHEN p.quantidade <= p.estoque_minimo THEN 2
+                        ELSE 3
+                    END,
+                    p.nome
+            """)
+            return cursor.fetchall()
+        except Exception as e:
+            print(f"Erro ao buscar produtos com estoque baixo: {e}")
+            return []
+        finally:
+            cursor.close()
+            conexao.close()

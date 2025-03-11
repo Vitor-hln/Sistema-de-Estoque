@@ -43,7 +43,7 @@ class MovementRepository:
         cursor.close()
         connection.close()
 
-    def registrar_movimentacao(self, data_hora, produto_id, tipo, quantidade, usuario, observacoes):   # Registra uma movimentação de estoque
+    def registrar_movimentacao(self, data_hora, produto_id, tipo, quantidade, usuario, observacoes, solicitante):   # Registra uma movimentação de estoque
 
         if data_hora is None:
           from datetime import datetime
@@ -54,9 +54,9 @@ class MovementRepository:
         try:
             # Insere a movimentação no banco de dados
             cursor.execute('''
-                INSERT INTO movimentacoes (data_hora, produto_id, tipo, quantidade, usuario, observacoes)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            ''', (data_hora, produto_id, tipo, quantidade, usuario, observacoes))
+                INSERT INTO movimentacoes (data_hora, produto_id, tipo, quantidade, usuario, observacoes, solicitante)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ''', (data_hora, produto_id, tipo, quantidade, usuario, observacoes, solicitante))
             
             # Atulaliza o estoque do produto
             if tipo == 'Entrada':
@@ -87,6 +87,7 @@ class MovementRepository:
             SELECT 
             m.tipo, 
             m.quantidade, 
+            m.solicitante,
             m.usuario, 
             p.nome AS produto, 
             m.data_hora,

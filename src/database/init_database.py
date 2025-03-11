@@ -35,19 +35,6 @@ def init_database():
         """)  # Fixed the syntax error (colon changed to semicolon) and added categoria_id column
         print("Tabela 'produtos' criada ou já existente")
 
-        # Criar a tabela 'retiradas'
-        cursor.execute("""
-          CREATE TABLE IF NOT EXISTS retiradas (
-              id INT AUTO_INCREMENT PRIMARY KEY,
-              produto_id INT,
-              quantidade INT NOT NULL,
-              id_retirador VARCHAR(50) NOT NULL,
-              data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-              FOREIGN KEY (produto_id) REFERENCES produtos(id)
-          );
-        """)
-        print("Tabela 'retiradas' criada ou já existente.")
-
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS movimentacoes (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -57,6 +44,7 @@ def init_database():
                 quantidade INT NOT NULL,
                 usuario VARCHAR(50) NOT NULL,
                 observacoes TEXT,
+                solicitante VARCHAR(50) NOT NULL,
                 FOREIGN KEY (produto_id) REFERENCES produtos(id)
         )
         ''')

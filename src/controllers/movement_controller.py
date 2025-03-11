@@ -14,5 +14,4 @@ class MovimentacaoController:
 
     def listar_mov(self):
         movimentacoes = self.mv.listar_movimentacoes()
-        print(movimentacoes)
-        return self.mv.listar_movimentacoes()
+        return movimentacoes()

@@ -18,14 +18,14 @@ class TelaMovimentacao(tk.Frame):
         self.movement_repository = MovementRepository()
         
         # Título da tela
-        tk.Label(self, text="Movimentação de Estoque", font=("Helvetica", 16, "bold")).pack(pady=10)
+        tk.Label(self, text="Movimentação de Estoque", font=("Helvetica", 16, "bold")).pack(pady=5)
         
         # Frame para operações
-        op_frame = tk.LabelFrame(self, text="Operação", padx=20, pady=10)
+        op_frame = tk.LabelFrame(self, text="Operação", padx=20, pady=1)
         op_frame.pack(fill="both", padx=20, pady=10)
         
         # Selecionar tipo de operação
-        tk.Label(op_frame, text="Tipo de Operação:").grid(row=0, column=0, sticky="w", pady=5)
+        tk.Label(op_frame, text="Tipo de Operação:  ").grid(row=0, column=0, sticky="w", pady=5)
         
         self.tipo_operacao = tk.StringVar(value="entrada")
         rb_entrada = tk.Radiobutton(op_frame, text="Entrada", variable=self.tipo_operacao, value="entrada")
@@ -42,33 +42,35 @@ class TelaMovimentacao(tk.Frame):
         # Carregar produtos do banco de dados
         self.carregar_produtos()
         
+        # Funcionario Responsável (está como usuario no banco de dados)
+        tk.Label(op_frame, text="Responsável:").grid(row=2, column=0, sticky="w", pady=5)
+        self.funcionario_entry = tk.Entry(op_frame, width=20)
+        self.funcionario_entry.grid(row=2, column=1, sticky="w", pady=5)
+
+        # Solicitante
+        tk.Label(op_frame, text="Solicitante:").grid(row=3, column=0, sticky="w", pady=5)
+        self.solicitante_entry = tk.Entry(op_frame, width=20)
+        self.solicitante_entry.grid(row=3, column=1, sticky="w", pady=5)
+
         # Quantidade
-        tk.Label(op_frame, text="Quantidade:").grid(row=2, column=0, sticky="w", pady=5)
+        tk.Label(op_frame, text="Quantidade:").grid(row=4, column=0, sticky="w", pady=5)
         self.quantidade_entry = tk.Entry(op_frame, width=10)
-        self.quantidade_entry.grid(row=2, column=1, sticky="w", pady=5)
-        
-        # ID do Usuario
-        tk.Label(op_frame, text="Funcionario:").grid(row=3, column=0, sticky="w", pady=5)
-        self.funcionario_entry = tk.Entry(op_frame, width=10)
-        self.funcionario_entry.grid(row=3, column=1, sticky="w", pady=5)
+        self.quantidade_entry.grid(row=4, column=1, sticky="w", pady=5)
         
         # Observações
-        tk.Label(op_frame, text="Observações:").grid(row=4, column=0, sticky="w", pady=5)
-        self.obs_text = tk.Text(op_frame, width=35, height=3)
-        self.obs_text.grid(row=4, column=1, columnspan=2, sticky="w", pady=5)
+        tk.Label(op_frame, text="Observações:").grid(row=5, column=0, sticky="w", pady=5)
+        self.obs_text = tk.Text(op_frame, width=35, height=2)
+        self.obs_text.grid(row=5, column=1, columnspan=2, sticky="w", pady=5)
         
         # Botão para registrar movimentação
         # Criar um espaço abaixo antes do botão
         op_frame.rowconfigure(5, minsize=20)  # Garante espaço extra
 
         # Botão para registrar movimentação em uma linha abaixo
-        btn_frame = tk.Frame(op_frame)
-        btn_frame.grid(row=4, column=4, columnspan=2, sticky="e", pady=10, padx=20)  # Movido para row=5
-
-        self.btn_movimentar = tk.Button(btn_frame, text="Registrar Movimentação", 
+        self.btn_movimentar = tk.Button(op_frame, text="Registrar Movimentação", 
                                         command=self.adicionar_movimentacao, width=20,
                                         bg="#4a86e8", fg="white")
-        self.btn_movimentar.pack()
+        self.btn_movimentar.grid(row=5, column=15, columnspan=2, sticky="e", pady=10, padx=(120,0))  # Usando grid em vez de pack
         
         # Frame para histórico de movimentações
         self.criar_historico()
@@ -85,7 +87,7 @@ class TelaMovimentacao(tk.Frame):
         historico_frame.pack(fill="both", expand=True, padx=20, pady=10)
         
         # Treeview para listar as movimentações
-        colunas = ("Tipo", "QTD", "Peças", "QTD Atual", "Funcionario",  "Data/Hora")
+        colunas = ("Tipo", "QTD", "Peças", "QTD Atual", "Responsável", "Solicitante", "Data/Hora")
         self.tabela = ttk.Treeview(historico_frame, columns=colunas, show="headings")
         
         # Definir cabeçalhos da tabela
@@ -99,7 +101,10 @@ class TelaMovimentacao(tk.Frame):
         self.tabela.column("Peças", width=100)
         self.tabela.column("QTD", width=40)
         self.tabela.column("QTD Atual", width=50)
+        self.tabela.column("Responsável", width=50)
+        self.tabela.column("Solicitante", width=50)
         
+
         # Scrollbar para a tabela
         scrollbar = ttk.Scrollbar(historico_frame, orient="vertical", command=self.tabela.yview)
         self.tabela.configure(yscrollcommand=scrollbar.set)
@@ -116,7 +121,6 @@ class TelaMovimentacao(tk.Frame):
     
         controller = MovimentacaoController() # Criando uma instância do controlador
         movimentacoes = controller.listar_mov()
-        print(movimentacoes)
         for mov in movimentacoes:
             data_formatada = mov['data_hora'].strftime("%d/%m/%Y %H:%M:%S")
             self.tabela.insert(
@@ -126,6 +130,7 @@ class TelaMovimentacao(tk.Frame):
                 mov.get('produto', 'Desconhecido'),
                 mov.get('qtd_atualizada', 0),
                 mov.get('usuario', 'Desconhecido'),
+                mov.get('solicitante', 'Desconhecido'),
                 data_formatada
             ))
 
@@ -168,8 +173,8 @@ class TelaMovimentacao(tk.Frame):
             quantidade=quantidade,
             usuario=usuario,
             observacoes=observacoes,
-            data_hora=datetime.now()
-            
+            data_hora=datetime.now(),
+            solicitante=self.solicitante_entry.get()
         )
         
         if sucesso:

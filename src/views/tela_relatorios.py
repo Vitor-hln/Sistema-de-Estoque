@@ -7,6 +7,7 @@ from database import conectar
 import openpyxl
 from openpyxl.styles import Font
 from tkinter import filedialog, messagebox
+from repositories.report_repository import ReportRepository
 
 class TelaRelatorios(tk.Frame):
     def __init__(self, master):
@@ -21,15 +22,15 @@ class TelaRelatorios(tk.Frame):
         filtros_frame.pack(fill="x", padx=20, pady=10)
         
         # Tipo de relatório
-        tk.Label(filtros_frame, text="Tipo de Relatório:").grid(row=0, column=0, sticky="w", pady=5)
-        self.tipo_relatorio = ttk.Combobox(filtros_frame, width=30)
-        self.tipo_relatorio['values'] = ["Movimentações de Estoque", "Produtos com Estoque Baixo", 
-                                       "Produtos Mais Movimentados", "Valor Total em Estoque"]
+        tk.Label(filtros_frame, text="Relatório de:").grid(row=0, column=0, sticky="w", pady=10)
+        self.tipo_relatorio = ttk.Combobox(filtros_frame, width=25)
+        self.tipo_relatorio['values'] = ["Movimentações de Estoque", "Peças com Estoque Baixo", 
+                                       "Peças Mais Movimentadas", "Valor Total em Estoque"]
         self.tipo_relatorio.current(0)
         self.tipo_relatorio.grid(row=0, column=1, sticky="w", pady=5)
         
         # Período
-        tk.Label(filtros_frame, text="Período:").grid(row=1, column=0, sticky="w", pady=5)
+        tk.Label(filtros_frame, text="Período").grid(row=1, column=0, sticky="w", pady=5)
         
         periodo_frame = tk.Frame(filtros_frame)
         periodo_frame.grid(row=1, column=1, sticky="w", pady=5)
@@ -57,11 +58,12 @@ class TelaRelatorios(tk.Frame):
         
         # Botão para gerar relatório
         self.btn_gerar = tk.Button(filtros_frame, text="Gerar Relatório", command=self.gerar_relatorio,bg="#4a86e8", fg="white", width=15)
+        self.btn_gerar.grid(row=1, column=2, sticky="ew", padx=60, pady=5)
+        
         self.btn_exportar = tk.Button(filtros_frame, text="Exportar Relatório", command=self.exportar_para_excel, bg="#4a86e8", fg="white", width=15)
+        self.btn_exportar.grid(row=2, column=2, sticky="ew", padx=60, pady=5)
         
-        
-        self.btn_gerar.grid(row=3, column=0, sticky="e", pady=10)
-        self.btn_exportar.grid(row=3, column=1, sticky="e", pady=10)
+
         
         # Inicializar com o período de hoje
         self.definir_periodo(0)
@@ -110,7 +112,7 @@ class TelaRelatorios(tk.Frame):
 
     def relatorio_movimentacoes(self):
         # Criar treeview para movimento de estoque
-        colunas = ("ID", "Data/Hora", "Produto", "Tipo", "Quantidade", "Usuário")
+        colunas = ("Tipo", "Produto", "Quantidade", "Usuário","Data/Hora")
         self.tabela = ttk.Treeview(self.relatorio_frame, columns=colunas, show="headings")
         
         # Definir cabeçalhos
@@ -120,7 +122,7 @@ class TelaRelatorios(tk.Frame):
         
         # Ajustar larguras específicas
         self.tabela.column("Data/Hora", width=150)
-        self.tabela.column("Produto", width=200)
+        self.tabela.column("Produto", width=100)
         
         # Scrollbar
         scrollbar = ttk.Scrollbar(self.relatorio_frame, orient="vertical", command=self.tabela.yview)
@@ -152,20 +154,20 @@ class TelaRelatorios(tk.Frame):
                 data_formatada = mov['data_hora'].strftime("%d/%m/%Y %H:%M:%S")
                 self.tabela.insert(
                     "", "end",
-                    values=(
-                    mov['id'], data_formatada, mov['produto'], mov['tipo'], mov['quantidade'], mov['usuario']
+                    values=( 
+                    mov['tipo'],      
+                    mov['produto'],  
+                    mov['quantidade'], 
+                    mov['usuario'],
+                    data_formatada
                 ))
 
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao buscar movimentações: {e}")
     
-        finally:
-            cursor.close()
-            conexao.close()
-
     def relatorio_estoque_baixo(self):
         # Criar treeview para produtos com estoque baixo
-        colunas = ("ID", "Produto", "Estoque Atual", "Estoque Mínimo", "Status")
+        colunas = ("Produto", "Estoque Atual", "Estoque Mínimo", "Status")
         tabela = ttk.Treeview(self.relatorio_frame, columns=colunas, show="headings")
         
         # Definir cabeçalhos
@@ -175,6 +177,9 @@ class TelaRelatorios(tk.Frame):
         
         # Ajustar larguras específicas
         tabela.column("Produto", width=250)
+        tabela.column("Estoque Atual", width=100)
+        tabela.column("Estoque Mínimo", width=100)
+        tabela.column("Status", width=100)
         
         # Scrollbar
         scrollbar = ttk.Scrollbar(self.relatorio_frame, orient="vertical", command=tabela.yview)
@@ -183,26 +188,31 @@ class TelaRelatorios(tk.Frame):
         # Posicionar na tela
         tabela.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        
-        # Adicionar dados de exemplo
-        for i in range(10):
-            estoque_atual = i
-            estoque_minimo = 10
-            status = "CRÍTICO" if estoque_atual < 5 else "BAIXO"
-            
-            tabela.insert("", "end", values=(f"{i+1}", f"Produto {i+1}", estoque_atual, 
-                                          estoque_minimo, status))
-            
-            # Aplicar cor de fundo com base no status
-            item = tabela.get_children()[-1]
-            if status == "CRÍTICO":
-                tabela.item(item, tags=("critico",))
-            else:
-                tabela.item(item, tags=("baixo",))
+
+        report_repository = ReportRepository()
+        try:
+            produtos = report_repository.listar_produtos_estoque_baixo()
+
+            for produto in produtos:
+                status = produto.get('status', 'Desconhecido')
+                tabela.insert(
+                    "", "end",
+                    values=(
+                        produto.get('produto', 'Desconhecido'),
+                        produto.get('estoque_atual', 0),
+                        produto.get('estoque_minimo', 0),
+                        status
+                    ),
+                    tags=(status.lower(),)
+                )
+
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao buscar produtos com estoque baixo: {e}")
         
         # Definir cores para as tags
-        tabela.tag_configure("critico", background="#ffcccc")
-        tabela.tag_configure("baixo", background="#ffffcc")
+        tabela.tag_configure("crítico", background="#ffcccc")  # Vermelho claro para crítico
+        tabela.tag_configure("baixo", background="#ffffcc")    # Amarelo claro para baixo
+        tabela.tag_configure("normal", background="#ccffcc")   # Verde claro para normal
     
     def relatorio_mais_movimentados(self):
         # Criar treeview para produtos mais movimentados
