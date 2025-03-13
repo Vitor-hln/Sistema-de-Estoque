@@ -1,25 +1,20 @@
 import datetime
 import mysql.connector
 import configparser
+import sys
+import os
+
+# Adicionar o diretório raiz ao path para evitar problemas de importação
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+from src.database.database import conectar
 
 class MovementRepository:
     def __init__(self):
-        self.config = self._load_config()     # Carrega as configurações do banco de dados   
+        pass  # Não precisamos mais carregar configurações
 
-
-    def _load_config(self):
-        config = configparser.ConfigParser()
-        config.read('config.ini')# Certifique-se de que o arquivo config.ini está no mesmo diretório ou ajuste o caminho conforme necessário
-        return config
-    
-
-    def _get_connection(self):      # Estabelece a conexão com o banco de dados
-        return mysql.connector.connect(
-            host=self.config['database']['host'],
-            user=self.config['database']['user'],
-            password=self.config['database']['password'],
-            database=self.config['database']['database']
-        )
+    def _get_connection(self):
+        """Estabelece a conexão com o banco de dados usando a função conectar()"""
+        return conectar()
     
     def _init_db(self):
         # Cria a tabela de produtos se ela não existir
