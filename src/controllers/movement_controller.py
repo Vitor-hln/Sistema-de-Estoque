@@ -14,4 +14,4 @@ class MovimentacaoController:
 
     def listar_mov(self):
         movimentacoes = self.mv.listar_movimentacoes()
-        return movimentacoes()
+        return movimentacoes  # Retorna a lista diretamente, sem os parênteses

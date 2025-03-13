@@ -1,25 +1,18 @@
-from calendar import c
 import mysql.connector
-import configparser
+import sys
+import os
+
+# Adicionar o diretório raiz ao path para evitar problemas de importação
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+from src.database.database import conectar
 
 class ProductRepository:
     def __init__(self):
-        self.config = self._load_config()  # Carrega as configurações do banco de dados   
-
-    def _load_config(self):
-        """Carrega as configurações do banco de dados a partir de um arquivo INI"""
-        config = configparser.ConfigParser()
-        config.read('config.ini')  # Certifique-se de que o arquivo config.ini está no mesmo diretório
-        return config
+        pass  # Não precisamos mais carregar configurações
 
     def _get_connection(self):
-        """Estabelece a conexão com o banco de dados"""
-        return mysql.connector.connect(
-            host=self.config['database']['host'],
-            user=self.config['database']['user'],
-            password=self.config['database']['password'],
-            database=self.config['database']['database']
-        )
+        """Estabelece a conexão com o banco de dados usando a função conectar()"""
+        return conectar()
 
     def adicionar_produto(self, nome, descricao, valor, quantidade, lote=None):
         """Insere um novo produto no banco de dados"""
