@@ -1,7 +1,7 @@
 from database import conectar
 
 class ReportRepository:
-    def listar_relatorios(self, tipo_relatorio, data_inicio, data_fim):
+    def relatorio_movimentacoes(self, tipo_relatorio, data_inicio, data_fim):
         """Busca os dados reais do banco para os relatórios"""
         conexao = conectar()
         cursor = conexao.cursor(dictionary=True)
@@ -59,9 +59,10 @@ class ReportRepository:
             cursor.close()
             conexao.close()
 
-
     def listar_produtos_estoque_baixo(self):
-        """Busca os produtos com estoque baixo"""
+
+        
+        """Busca conexão do banco de dados para estoque baixo"""
         conexao = conectar()
         cursor = conexao.cursor(dictionary=True)
         
@@ -94,3 +95,82 @@ class ReportRepository:
         finally:
             cursor.close()
             conexao.close()
+
+    def mais_movimentados_registro(self):
+
+        
+            """Busca conexão do banco de dados para mais movimentados"""
+            conexao = conectar()
+            cursor = conexao.cursor(dictionary=True)
+        
+            try:
+                cursor = conexao.cursor(dictionary=True)
+                cursor.execute("""
+                    SELECT
+                        p.nome AS produto,
+                        COUNT(m.id) AS total_movimentacoes,
+                        SUM(CASE WHEN m.tipo = 'Entrada' THEN 1 ELSE 0 END) AS entradas,
+                        SUM(CASE WHEN m.tipo = 'Saída' THEN 1 ELSE 0 END) AS saidas
+                    FROM movimentacoes m
+                    JOIN produtos p ON m.produto_id = p.id
+                    GROUP BY p.nome
+                    ORDER BY total_movimentacoes DESC;
+            """)
+                return cursor.fetchall()
+            except Exception as e:
+                print(f"Erro ao buscar produtos com estoque baixo: {e}")
+                return []
+            finally:
+                cursor.close()
+                conexao.close()
+
+    def mais_movimentados_volume(self):
+            
+            """Busca conexão do banco de dados para mais movimentados por volume de peças"""
+            conexao = conectar()
+            cursor = conexao.cursor(dictionary=True)
+
+            try:
+                cursor = conexao.cursor(dictionary=True)
+                cursor.execute("""       
+                        SELECT 
+                            p.nome AS produto, 
+                            SUM(ABS(m.quantidade)) AS volume_movimentado
+                        FROM movimentacoes m
+                        JOIN produtos p ON m.produto_id = p.id
+                        GROUP BY p.nome
+                        ORDER BY volume_movimentado DESC;
+                    """)
+                return cursor.fetchall()
+            except Exception as e:
+                print(f"Erro ao buscar produtos com estoque baixo: {e}")
+                return []
+            finally:
+                cursor.close()
+                conexao.close()
+
+    def valor_total_em_estoque(self):
+    #Busca conexão do banco de dados para mais movimentados por volume de peças
+        conexao = conectar()
+        cursor = conexao.cursor(dictionary=True)   
+
+        try:
+
+            cursor.execute("""
+                SELECT 
+                    id,
+                    nome AS produto,
+                    quantidade,
+                    valor,
+                    quantidade * valor AS valor_total
+                FROM produtos;
+
+             """       
+            )
+            return cursor.fetchall()
+        except Exception as e:
+            print(f"Erro ao buscar valor total dos produtos: {e}")
+        finally:
+            cursor.close()
+            conexao.close()
+            

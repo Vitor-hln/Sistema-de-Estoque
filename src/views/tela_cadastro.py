@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+from database.database import conectar
 from models.product import Produto
 from repositories.product_repository import ProductRepository
 from controllers.product_controller import ProductController
@@ -109,41 +110,43 @@ class TelaCadastro(tk.Frame):
     
 
     def salvar(self):
-        # Função para salvar o produto
-        nome = self.nome_entry.get()
-        descricao = self.descricao_text.get("1.0", "end-1c")
-        lote = self.lote_entry.get()
-        # Validando preço
-        try:
-            valor = float(self.valor_entry.get())
-        except ValueError:
-            messagebox.showerror("Erro", "Preço inválido!")
-            return
-        # Validando quantidade
-        try:
-            quantidade = int(self.qtd_entry.get())
-        except ValueError:
-            messagebox.showerror("Erro", "Quantidade inválida!")
-            return
-        # Validação básica
-        if not nome:
-            messagebox.showerror("Erro", "Nome do produto é obrigatório!")
-            return
-        
-        print(f"Nome: {nome}, Descrição: {descricao}, Preço: {valor}, Quantidade: {quantidade}, Lote: {lote}")
+       # Obter os valores dos campos do formulário
+       nome = self.nome_entry.get()
+       descricao = self.descricao_text.get("1.0", "end-1c")
+       lote = self.lote_entry.get()
+       valor = self.valor_entry.get()
+       quantidade = self.qtd_entry.get()
 
-        # Implementação da lógica para salvar no banco de dados
+       # Conectar ao banco de dados
+       conexao = conectar()
+       cursor = conexao.cursor()
        
-            # Chamar o controlador para adicionar o produto
-        mensagem = ProductController.adicionar_produto(nome, descricao, valor, quantidade, lote)
-
-        # Exibir mensagem de sucesso ou erro
-        if "sucesso" in mensagem.lower():
-            messagebox.showinfo("Sucesso", mensagem)
-            self.limpar_campos()
-            self.atualizar_lista_produtos()  # Atualizar a interface para   refletir os novos dados
-        else:
-            messagebox.showerror("Erro", mensagem)
+       try:
+           if hasattr(self, 'id_produto') and self.id_produto is not None:
+               # Modo edição: atualizar o registro existente
+               query = """
+                   UPDATE produtos 
+                   SET nome = %s, quantidade = %s, valor = %s
+                   WHERE id = %s
+               """
+               parametros = (nome, quantidade, valor, lote, self.id_produto)
+               cursor.execute(query, parametros)
+           else:
+               # Modo cadastro: inserir um novo produto
+               query = """
+                   INSERT INTO produtos (nome, quantidade, valor, lote)
+                   VALUES (%s, %s, %s, %s)
+               """
+               parametros = (nome, quantidade, valor, lote)
+               cursor.execute(query, parametros)
+               
+           conexao.commit()
+           messagebox.showinfo("Sucesso", "Produto salvo com sucesso!")
+       except Exception as e:
+           messagebox.showerror("Erro", f"Erro ao salvar o produto: {e}")
+       finally:
+           cursor.close()
+           conexao.close()
 
 
     def limpar_campos(self):

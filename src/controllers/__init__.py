@@ -1,1 +1,2 @@
 from .product_controller import ProductController
+from .report_controller import ReportController

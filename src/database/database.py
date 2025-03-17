@@ -14,7 +14,6 @@ def conectar():
             password=os.getenv("DB_PASSWORD", ""),  # Pega a senha do .env
             database="controle_estoque"  
         )
-        print("✅ Conexão bem-sucedida com o banco de dados!")
         return conexao
     except mysql.connector.Error as e:
         print(f"❌ Erro ao conectar ao MySQL: {e}")

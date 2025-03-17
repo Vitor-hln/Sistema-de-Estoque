@@ -7,7 +7,8 @@ from database import conectar
 import openpyxl
 from openpyxl.styles import Font
 from tkinter import filedialog, messagebox
-from repositories.report_repository import ReportRepository
+from datetime import datetime
+from controllers.report_controller import ReportController
 
 class TelaRelatorios(tk.Frame):
     def __init__(self, master):
@@ -23,9 +24,9 @@ class TelaRelatorios(tk.Frame):
         
         # Tipo de relatório
         tk.Label(filtros_frame, text="Relatório de:").grid(row=0, column=0, sticky="w", pady=10)
-        self.tipo_relatorio = ttk.Combobox(filtros_frame, width=25)
+        self.tipo_relatorio = ttk.Combobox(filtros_frame, width=40)
         self.tipo_relatorio['values'] = ["Movimentações de Estoque", "Peças com Estoque Baixo", 
-                                       "Peças Mais Movimentadas", "Valor Total em Estoque"]
+                                       "Peças Mais Movimentadas por Entrada ou Saída","Peças Mais Movimentadas por Volume", "Valor Total em Estoque"]
         self.tipo_relatorio.current(0)
         self.tipo_relatorio.grid(row=0, column=1, sticky="w", pady=5)
         
@@ -101,10 +102,12 @@ class TelaRelatorios(tk.Frame):
         # Criar tabela para relatório
         if tipo == "Movimentações de Estoque":
             self.relatorio_movimentacoes()
-        elif tipo == "Produtos com Estoque Baixo":
+        elif tipo == "Peças com Estoque Baixo":
             self.relatorio_estoque_baixo()
-        elif tipo == "Produtos Mais Movimentados":
-            self.relatorio_mais_movimentados()
+        elif tipo == "Peças Mais Movimentadas por Entrada ou Saída":
+            self.relatorio_mais_movimentados_registro()
+        elif tipo == "Peças Mais Movimentadas por Volume":
+            self.relatorio_mais_movimentados_volume()
         elif tipo == "Valor Total em Estoque":
             self.relatorio_valor_estoque()
         else:
@@ -131,147 +134,197 @@ class TelaRelatorios(tk.Frame):
         # Posicionar na tela
         self.tabela.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        
+
         try:
-            conexao = conectar()
-            cursor = conexao.cursor(dictionary=True)
-            cursor.execute("""
-                SELECT 
-                    m.id, 
-                    m.data_hora, 
-                    p.nome AS produto, 
-                    m.tipo, 
-                    m.quantidade, 
-                    m.usuario 
-                FROM movimentacoes m
-                JOIN produtos p ON m.produto_id = p.id
-                ORDER BY m.data_hora DESC
-            """)
+            # Obtenha os valores do período
+            data_inicio_str = self.data_inicio.get()  # Ex: "15/03/2025"
+            data_fim_str = self.data_fim.get()        # Ex: "15/03/2025"
+            tipo = self.tipo_relatorio.get()
 
-            movimentacoes = cursor.fetchall()
+            # Converter para o formato "aaaa-mm-dd"
+            data_inicio = datetime.strptime(data_inicio_str, "%d/%m/%Y").strftime("%Y-%m-%d")
+            data_fim = datetime.strptime(data_fim_str, "%d/%m/%Y").strftime("%Y-%m-%d")
 
-            for mov in movimentacoes:
+            controller = ReportController()
+            dados = controller.obter_movimentacoes(tipo, data_inicio, data_fim)
+
+            for mov in dados:
                 data_formatada = mov['data_hora'].strftime("%d/%m/%Y %H:%M:%S")
-                self.tabela.insert(
-                    "", "end",
+                self.tabela.insert("", "end",
                     values=( 
-                    mov['tipo'],      
-                    mov['produto'],  
-                    mov['quantidade'], 
-                    mov['usuario'],
-                    data_formatada
-                ))
+                        mov['tipo'],      
+                        mov['produto'],  
+                        mov['quantidade'], 
+                        mov['usuario'],
+                        data_formatada
+                    ))
 
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao buscar movimentações: {e}")
-    
+   
     def relatorio_estoque_baixo(self):
+        controller = ReportController()
+
         # Criar treeview para produtos com estoque baixo
         colunas = ("Produto", "Estoque Atual", "Estoque Mínimo", "Status")
         tabela = ttk.Treeview(self.relatorio_frame, columns=colunas, show="headings")
-        
-        # Definir cabeçalhos
+
+        # Definir cabeçalhos e configurações das colunas
         for col in colunas:
             tabela.heading(col, text=col)
             tabela.column(col, width=100, anchor="center")
-        
-        # Ajustar larguras específicas
+
         tabela.column("Produto", width=250)
         tabela.column("Estoque Atual", width=100)
         tabela.column("Estoque Mínimo", width=100)
         tabela.column("Status", width=100)
-        
+
         # Scrollbar
         scrollbar = ttk.Scrollbar(self.relatorio_frame, orient="vertical", command=tabela.yview)
         tabela.configure(yscrollcommand=scrollbar.set)
-        
+
         # Posicionar na tela
         tabela.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        report_repository = ReportRepository()
         try:
-            produtos = report_repository.listar_produtos_estoque_baixo()
-
-            for produto in produtos:
-                status = produto.get('status', 'Desconhecido')
+            # Utiliza o controller para obter os produtos com estoque baixo
+            produtos = controller.obter_produtos_estoque_baixo()
+            for prod in produtos:
+                status = prod.get('status', 'Desconhecido')
                 tabela.insert(
                     "", "end",
                     values=(
-                        produto.get('produto', 'Desconhecido'),
-                        produto.get('estoque_atual', 0),
-                        produto.get('estoque_minimo', 0),
+                        prod.get('produto', 'Desconhecido'),
+                        prod.get('estoque_atual', 0),
+                        prod.get('estoque_minimo', 0),
                         status
                     ),
                     tags=(status.lower(),)
                 )
-
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao buscar produtos com estoque baixo: {e}")
-        
+
         # Definir cores para as tags
         tabela.tag_configure("crítico", background="#ffcccc")  # Vermelho claro para crítico
         tabela.tag_configure("baixo", background="#ffffcc")    # Amarelo claro para baixo
         tabela.tag_configure("normal", background="#ccffcc")   # Verde claro para normal
-    
-    def relatorio_mais_movimentados(self):
-        # Criar treeview para produtos mais movimentados
-        colunas = ("Ranking", "Produto", "Total Movimentações", "Entradas", "Saídas")
+  
+    def relatorio_mais_movimentados_registro(self):
+        controller = ReportController()
+        # Definir as colunas do Treeview
+        colunas = ("Rank", "Produto", "Total Mov's", "Entradas", "Saídas")
         tabela = ttk.Treeview(self.relatorio_frame, columns=colunas, show="headings")
-        
-        # Definir cabeçalhos
+
+        # Configurar os cabeçalhos e larguras
         for col in colunas:
             tabela.heading(col, text=col)
             tabela.column(col, width=100, anchor="center")
-        
-        # Ajustar larguras específicas
-        tabela.column("Produto", width=250)
-        
-        # Scrollbar
+            tabela.column("Rank", width=30)
+            tabela.column("Produto", width=200)
+            tabela.column("Entradas", width=15)
+            tabela.column("Saídas", width=15)
+
+        # Configurar o scrollbar
         scrollbar = ttk.Scrollbar(self.relatorio_frame, orient="vertical", command=tabela.yview)
         tabela.configure(yscrollcommand=scrollbar.set)
-        
+
         # Posicionar na tela
         tabela.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        
-        # Adicionar dados de exemplo
-        for i in range(10):
-            entradas = i * 10
-            saidas = i * 5
-            total = entradas + saidas
-            
-            tabela.insert("", "end", values=(f"{i+1}", f"Produto {i+1}", total, entradas, saidas))
-    
+
+        try:
+            # Obtém os produtos mais movimentados
+            produtos = controller.obter_mais_movimentado_registro()
+            # Insere os dados na Treeview, atribuindo um ranking sequencial
+            for idx, prod in enumerate(produtos, start=1):
+                tabela.insert(
+                    "", "end",
+                    values=(
+                        idx,
+                        prod.get('produto', 'Desconhecido'),
+                        prod.get('total_movimentacoes', 0),
+                        prod.get('entradas', 0),
+                        prod.get('saidas', 0)
+                    )
+                )
+        except Exception as e:
+            print("Erro ao buscar movimentações:", e)        
+
+    def relatorio_mais_movimentados_volume(self):
+        controller = ReportController()
+        # Definir as colunas do Treeview
+        colunas = ("Rank", "Produto", "Volume Movimentado")
+        tabela = ttk.Treeview(self.relatorio_frame, columns=colunas, show="headings")
+
+        # Configurar os cabeçalhos e larguras
+        for col in colunas:
+            tabela.heading(col, text=col)
+            tabela.column(col, width=100, anchor="center")
+            tabela.column("Rank", width=30)
+            tabela.column("Produto", width=200)
+
+        # Configurar o scrollbar
+        scrollbar = ttk.Scrollbar(self.relatorio_frame, orient="vertical", command=tabela.yview)
+        tabela.configure(yscrollcommand=scrollbar.set)
+
+        # Posicionar na tela
+        tabela.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        try:
+            # Obtém os produtos mais movimentados
+            produtos = controller.obter_mais_movimentado_volume()
+            # Insere os dados na Treeview, atribuindo um ranking sequencial
+            for idx, prod in enumerate(produtos, start=1):
+                tabela.insert(
+                    "", "end",
+                    values=(
+                        idx,
+                        prod.get('produto', 'Desconhecido'),
+                        prod.get('volume_movimentado', 0)
+                    )
+                )
+        except Exception as e:
+            print("Erro ao buscar movimentações:", e)  
+
     def relatorio_valor_estoque(self):
+        controller= ReportController()
         # Criar treeview para valor total em estoque
         colunas = ("ID", "Produto", "Quantidade", "Valor Unitário", "Valor Total")
-        tabela = ttk.Treeview(self.relatorio_frame, columns=colunas, show="headings")
+        self.tabela = ttk.Treeview(self.relatorio_frame, columns=colunas, show="headings")
         
         # Definir cabeçalhos
         for col in colunas:
-            tabela.heading(col, text=col)
-            tabela.column(col, width=100, anchor="center")
+            self.tabela.heading(col, text=col)
+            self.tabela.column(col, width=100, anchor="center")
         
         # Ajustar larguras específicas
-        tabela.column("Produto", width=250)
+        self.tabela.column("Produto", width=250)
         
         # Scrollbar
-        scrollbar = ttk.Scrollbar(self.relatorio_frame, orient="vertical", command=tabela.yview)
-        tabela.configure(yscrollcommand=scrollbar.set)
+        scrollbar = ttk.Scrollbar(self.relatorio_frame, orient="vertical", command=self.tabela.yview)
+        self.tabela.configure(yscrollcommand=scrollbar.set)
         
         # Posicionar na tela
-        tabela.pack(side="left", fill="both", expand=True)
+        self.tabela.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
         # Adicionar dados de exemplo
-        for i in range(10):
-            quantidade = i * 10
-            valor_unitario = 5.0
-            valor_total = quantidade * valor_unitario
-            
-            tabela.insert("", "end", values=(f"{i+1}", f"Produto {i+1}", quantidade, 
-                                          f"R$ {valor_unitario:.2f}", f"R$ {valor_total:.2f}"))
+        try:
+            # Obtém os produtos mais movimentados
+            valor = controller.obter_valor_total()
+            # Insere os dados na Treeview, atribuindo um ranking sequencial
+            for val in valor:
+                self.tabela.insert("","end", values=(
+                        val.get('id'),
+                        val.get('produto', 'Desconhecido'),
+                        val.get('quantidade', 0),
+                        f"R$ {val.get('valor', 0)}",
+                        f"R$ {val.get('valor_total', 0)}"
+                ))
+        except Exception as e:
+            print("Erro ao buscar movimentações:", e)  
             
     def exportar_para_excel(self):
         if not self.tabela.get_children():
@@ -316,23 +369,3 @@ class TelaRelatorios(tk.Frame):
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao exportar para Excel: {e}")
 
-
-    """   def exportar_para_csv(self):
-           if not hasattr(self, "tabela"):
-               messagebox.showwarning("Aviso", "Nenhum relatório foi gerado ainda!")
-               return
-           
-           arquivo = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("Arquivo CSV", "*.csv")])
-           
-           if not arquivo:
-               return
-           
-           colunas = [self.tabela.heading(col)["text"] for col in self.tabela["columns"]]
-           dados = [self.tabela.item(item, "values") for item in self.tabela.get_children()]
-           
-           with open(arquivo, mode="w", newline="", encoding="utf-8") as f:
-               escritor = csv.writer(f)
-               escritor.writerow(colunas)
-               escritor.writerows(dados)
-           
-           messagebox.showinfo("Sucesso", "Relatório exportado com sucesso!")"""
